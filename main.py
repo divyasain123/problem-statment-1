@@ -15,6 +15,7 @@ print(data[0])
 # Initialize a dictionary to hold wallet-wise statistics
 wallet_stats = defaultdict(lambda: {
     'deposit_count': 0,
+    
     'borrow_count': 0,
     'repay_count': 0,
     'redeem_count': 0,
