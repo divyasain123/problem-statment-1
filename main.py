@@ -1,4 +1,6 @@
 import json
+import pandas as pd
+import numpy as np
 from collections import defaultdict
 
 file_path = r"D:\user-wallet-transactions (1).json"
@@ -20,14 +22,14 @@ wallet_stats = defaultdict(lambda: {
     'repay_count': 0,
     'redeem_count': 0,
     'liquidation_count': 0,
-    'total_amount': 0.0,
+    'total_amount': 0.0,\
     'first_tx': float('inf'),
     'last_tx': 0,
     'assets': set()
 })
 
 # Parse and aggregate statistics
-for tx in transactions:
+for tx in data:
     wallet = tx.get('userWallet')
     action = tx.get('action')
     timestamp = tx.get('timestamp')
@@ -62,3 +64,48 @@ for stats in wallet_stats.values():
 # Preview first 3 wallets' stats
 preview_stats = dict(list(wallet_stats.items())[:3])
 preview_stats
+
+
+# Convert wallet_stats dictionary into a DataFrame
+df = pd.DataFrame.from_dict(wallet_stats, orient='index')
+
+# Reset index to get wallet address as a column
+df.reset_index(inplace=True)
+df.rename(columns={'index': 'wallet'}, inplace=True)
+
+# Preview the first 5 wallets
+print("\nSummary for first 5 wallets:")
+print(df.head())
+
+# Save to CSV for review (optional)
+df.to_csv("wallet_summary.csv", index=False)
+
+print("\nAvailable columns in DataFrame:")
+print(df.columns)
+
+# Function to score each row (wallet)
+def compute_score(row):
+    score = 500
+
+    if 'borrow_amount' in row and row['borrow_amount'] > 0:
+        repay_ratio = row['repay_amount'] / row['borrow_amount']
+        score += min(repay_ratio, 1) * 300
+    else:
+        repay_ratio = 0
+
+    score += min(row.get('deposit_count', 0), 10) * 10
+    score += min(row.get('unique_assets', 0), 5) * 10
+    score -= min(row.get('liquidation_count', 0), 5) * 30
+
+    return np.clip(score, 0, 1000)
+
+
+# Compute score per wallet
+df['score'] = df.apply(compute_score, axis=1)
+
+# View top 5 scored wallets
+print("\nTop 5 wallets with scores:")
+print(df[['wallet', 'score']].sort_values(by='score', ascending=False).head())
+
+# Save final scored data
+df.to_csv("wallet_credit_scores.csv", index=False)
